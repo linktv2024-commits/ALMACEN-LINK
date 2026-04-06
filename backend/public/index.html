@@ -2,33 +2,55 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Almacén LinkTV</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkTV - Almacén Pro</title>
     <style>
-        body { font-family: sans-serif; margin: 40px; background: #f4f4f9; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; }
-        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
-        th { background-color: #007bff; color: white; }
-        .container { max-width: 800px; margin: auto; }
-        input, button { padding: 10px; margin: 5px 0; }
-        button { background: #28a745; color: white; border: none; cursor: pointer; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background: #f0f2f5; color: #333; }
+        .navbar { background: #1a73e8; color: white; padding: 1rem; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .container { max-width: 1000px; margin: 20px auto; padding: 20px; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        h2 { border-bottom: 2px solid #1a73e8; padding-bottom: 10px; color: #1a73e8; }
+        .form-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 15px; }
+        input, select, button { padding: 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+        button { background: #28a745; color: white; border: none; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        button:hover { background: #218838; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; color: #555; }
+        .badge { padding: 4px 8px; border-radius: 12px; font-size: 12px; background: #e8f0fe; color: #1a73e8; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>📦 Inventario de Equipos - LinkTV</h1>
-        
-        <h3>Agregar Nuevo Equipo</h3>
-        <input type="text" id="equipo" placeholder="Ej: CCR2116">
-        <input type="text" id="marca" placeholder="Ej: MikroTik">
-        <input type="number" id="stock" placeholder="Cantidad">
-        <button onclick="agregar()">Guardar en Almacén</button>
 
+<div class="navbar">
+    <h1>📡 LinkTV - Administración de Almacén</h1>
+</div>
+
+<div class="container">
+    <div class="card">
+        <h2>Ingresar Nuevo Activo</h2>
+        <div class="form-group">
+            <input type="text" id="equipo" placeholder="Nombre (ej: ONT F670L)">
+            <input type="text" id="marca" placeholder="Marca (ej: ZTE)">
+            <input type="number" id="stock" placeholder="Cantidad">
+            <select id="categoria">
+                <option value="ONT">ONT (Clientes)</option>
+                <option value="Router">Routers / Core</option>
+                <option value="Planta Externa">Planta Externa</option>
+                <option value="Herramientas">Herramientas</option>
+            </select>
+        </div>
+        <button onclick="agregar()" style="width: 100%;">Registrar Equipo</button>
+    </div>
+
+    <div class="card">
+        <h2>📦 Stock Actual</h2>
         <table>
             <thead>
                 <tr>
-                    <th>ID</th>
                     <th>Equipo</th>
                     <th>Marca</th>
+                    <th>Categoría</th>
                     <th>Stock</th>
                 </tr>
             </thead>
@@ -36,37 +58,71 @@
         </table>
     </div>
 
-    <script>
-        async function cargarInventario() {
-            const res = await fetch('/inventario');
-            const datos = await res.json();
-            const body = document.getElementById('tabla-body');
-            body.innerHTML = datos.map(item => `
+    <div class="card">
+        <h2>📜 Historial de Movimientos (Últimos 20)</h2>
+        <table style="font-size: 13px;">
+            <thead>
                 <tr>
-                    <td>${item.id}</td>
-                    <td>${item.equipo}</td>
-                    <td>${item.marca}</td>
-                    <td>${item.stock}</td>
+                    <th>Fecha</th>
+                    <th>Equipo</th>
+                    <th>Acción</th>
+                    <th>Cant.</th>
                 </tr>
-            `).join('');
-        }
+            </thead>
+            <tbody id="historial-body"></tbody>
+        </table>
+    </div>
+</div>
 
-        async function agregar() {
-            const equipo = document.getElementById('equipo').value;
-            const marca = document.getElementById('marca').value;
-            const stock = document.getElementById('stock').value;
+<script>
+    async function cargarTodo() {
+        // Cargar Inventario
+        const resInv = await fetch('/inventario');
+        const inventario = await resInv.json();
+        document.getElementById('tabla-body').innerHTML = inventario.map(i => `
+            <tr>
+                <td><strong>${i.equipo}</strong></td>
+                <td>${i.marca}</td>
+                <td><span class="badge">${i.categoria}</span></td>
+                <td>${i.stock} unidades</td>
+            </tr>
+        `).join('');
 
-            await fetch('/agregar', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ equipo, marca, stock })
-            });
-            
-            alert('Equipo agregado');
-            cargarInventario();
-        }
+        // Cargar Historial
+        const resHist = await fetch('/historial');
+        const historial = await resHist.json();
+        document.getElementById('historial-body').innerHTML = historial.map(h => `
+            <tr>
+                <td style="color: #888;">${h.fecha}</td>
+                <td>${h.equipo_nombre}</td>
+                <td>${h.tipo_movimiento}</td>
+                <td>${h.cantidad}</td>
+            </tr>
+        `).join('');
+    }
 
-        cargarInventario();
-    </script>
+    async function agregar() {
+        const equipo = document.getElementById('equipo').value;
+        const marca = document.getElementById('marca').value;
+        const stock = document.getElementById('stock').value;
+        const categoria = document.getElementById('categoria').value;
+
+        if(!equipo || !marca || !stock) return alert("Completa todos los campos");
+
+        await fetch('/agregar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ equipo, marca, stock, categoria })
+        });
+
+        alert("Registro exitoso");
+        document.getElementById('equipo').value = "";
+        document.getElementById('stock').value = "";
+        cargarTodo();
+    }
+
+    cargarTodo();
+</script>
+
 </body>
 </html>

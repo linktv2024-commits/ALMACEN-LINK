@@ -6,79 +6,73 @@ const path = require('path');
 const app = express();
 const PORT = 3000;
 
-// Middlewares
 app.use(express.json());
-// Esta línea sirve los archivos de la carpeta "public" (tu HTML, CSS, JS)
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 
 let db;
 
-// Configuración de la Base de Datos
 (async () => {
-    try {
-        db = await open({
-            filename: './database.sqlite',
-            driver: sqlite3.Database
-        });
+    db = await open({
+        filename: './database.sqlite',
+        driver: sqlite3.Database
+    });
 
-        // Creamos la tabla de inventario si no existe
-        await db.exec(`
-            CREATE TABLE IF NOT EXISTS inventario (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                equipo TEXT NOT NULL,
-                marca TEXT NOT NULL,
-                stock INTEGER DEFAULT 0
-            )
-        `);
-        console.log("✅ Base de datos SQLite conectada y lista.");
-    } catch (error) {
-        console.error("❌ Error al conectar la base de datos:", error);
-    }
+    // Tabla de Inventario con Categoría
+    await db.exec(`
+        CREATE TABLE IF NOT EXISTS inventario (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            equipo TEXT NOT NULL,
+            marca TEXT NOT NULL,
+            stock INTEGER DEFAULT 0,
+            categoria TEXT DEFAULT 'General'
+        )
+    `);
+
+    // Tabla de Historial
+    await db.exec(`
+        CREATE TABLE IF NOT EXISTS historial (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            equipo_nombre TEXT,
+            tipo_movimiento TEXT,
+            cantidad INTEGER,
+            fecha DATETIME DEFAULT (DATETIME('now', 'localtime'))
+        )
+    `);
+    console.log("✅ Base de datos conectada con Historial y Categorías");
 })();
 
-// --- RUTAS DE LA API ---
-
-// 1. Obtener todos los equipos (GET)
+// OBTENER INVENTARIO
 app.get('/inventario', async (req, res) => {
-    try {
-        const lista = await db.all('SELECT * FROM inventario ORDER BY id DESC');
-        res.json(lista);
-    } catch (error) {
-        res.status(500).json({ error: "Error al obtener los datos" });
-    }
+    const lista = await db.all('SELECT * FROM inventario ORDER BY id DESC');
+    res.json(lista);
 });
 
-// 2. Agregar un equipo nuevo (POST)
+// AGREGAR EQUIPO Y REGISTRAR EN HISTORIAL
 app.post('/agregar', async (req, res) => {
-    const { equipo, marca, stock } = req.body;
-    
-    if (!equipo || !marca || stock === undefined) {
-        return res.status(400).send('Faltan datos obligatorios');
-    }
-
+    const { equipo, marca, stock, categoria } = req.body;
     try {
+        // Insertar en inventario
         await db.run(
-            'INSERT INTO inventario (equipo, marca, stock) VALUES (?, ?, ?)',
-            [equipo, marca, stock]
+            'INSERT INTO inventario (equipo, marca, stock, categoria) VALUES (?, ?, ?, ?)',
+            [equipo, marca, stock, categoria]
         );
-        res.status(201).send('Equipo guardado con éxito');
+        // Insertar en historial
+        await db.run(
+            'INSERT INTO historial (equipo_nombre, tipo_movimiento, cantidad) VALUES (?, ?, ?)',
+            [equipo, 'ENTRADA (Registro Inicial)', stock]
+        );
+        res.status(201).send('Guardado con éxito');
     } catch (error) {
-        res.status(500).send('Error al guardar el equipo');
+        res.status(500).send('Error al guardar');
     }
 });
 
-// 3. Eliminar un equipo (Opcional, para que tu sistema sea más completo)
-app.delete('/eliminar/:id', async (req, res) => {
-    const { id } = req.params;
-    try {
-        await db.run('DELETE FROM inventario WHERE id = ?', id);
-        res.send('Equipo eliminado');
-    } catch (error) {
-        res.status(500).send('Error al eliminar');
-    }
+// OBTENER HISTORIAL
+app.get('/historial', async (req, res) => {
+    const logs = await db.all('SELECT * FROM historial ORDER BY fecha DESC LIMIT 20');
+    res.json(logs);
 });
 
-// Iniciar el servidor
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Servidor corriendo en http://0.0.0.0:${PORT}`);
+    console.log(`🚀 Servidor en http://0.0.0.0:${PORT}`);
 });
